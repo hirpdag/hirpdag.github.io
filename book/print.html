@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="ch01-00-introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="ch02-00-hirpdag.html"><strong aria-hidden="true">2.</strong> Hirpdag</a></li><li class="chapter-item expanded "><a href="ch03-00-implementation.html"><strong aria-hidden="true">3.</strong> Implementation</a></li><li class="chapter-item expanded "><a href="ch04-00-techniques.html"><strong aria-hidden="true">4.</strong> Techniques</a></li></ol>            </div>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="ch01-00-introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="ch02-00-hirpdag.html"><strong aria-hidden="true">2.</strong> Hirpdag</a></li><li class="chapter-item expanded "><a href="ch03-00-implementation.html"><strong aria-hidden="true">3.</strong> Implementation</a></li><li class="chapter-item expanded "><a href="ch04-00-techniques.html"><strong aria-hidden="true">4.</strong> Techniques</a></li><li class="chapter-item expanded affix "><li class="part-title">User guide</li><li class="chapter-item expanded "><a href="ch05-00-serialization.html"><strong aria-hidden="true">5.</strong> Serialization</a></li></ol>            </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
 
@@ -403,6 +403,94 @@ struct Graph {
   edges: Vec&lt;(NodeIndex, NodeIndex)&gt;, // Sorted
 }
 </code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="serialization-1"><a class="header" href="#serialization-1">Serialization</a></h1>
+<p>Hirpdag serialization is always DAG-aware: each unique node is written exactly
+once, so structural sharing survives a round trip and output size is
+proportional to the number of <em>unique</em> nodes, not the tree expansion. A
+Fibonacci-shaped DAG with two-parent sharing serializes in linear space, where
+a naive tree walk would be exponential.</p>
+<h2 id="api"><a class="header" href="#api">API</a></h2>
+<p>Struct types that may be serialization roots are marked with
+<code>#[hirpdag(root)]</code>. <code>#[hirpdag_end]</code> then generates a <code>HirpdagArchiveRoots</code>
+struct with one vector per root type (field names are the snake_case type
+names), plus entry points:</p>
+<ul>
+<li><code>hirpdag_serialize(&amp;HirpdagArchiveRoots) -&gt; Result&lt;Vec&lt;u8&gt;, HirpdagSerializeError&gt;</code>
+— compact binary (via <a href="https://crates.io/crates/postcard">postcard</a>).</li>
+<li><code>hirpdag_deserialize(&amp;[u8]) -&gt; Result&lt;HirpdagArchiveRoots, HirpdagDeserializeError&gt;</code></li>
+<li><code>hirpdag_serialize_json</code> / <code>hirpdag_deserialize_json</code> — the same archive as
+human-readable JSON.</li>
+</ul>
+<p>Types without <code>#[hirpdag(root)]</code> can still appear anywhere <em>inside</em> the DAG;
+they just cannot be roots. <code>HirpdagArchiveRoots</code> implements <code>Default</code>, so a
+subset of the root types can be set with struct update syntax:</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[hirpdag(root)]
+struct Expr { ... }
+
+#[hirpdag(root)]
+struct Variables { ... }
+
+let bytes = hirpdag_serialize(&amp;HirpdagArchiveRoots {
+    expr: vec![e1, e2],
+    variables: vec![vars],
+})?;
+
+let out = hirpdag_deserialize(&amp;bytes)?;
+let e1_again: &amp;Expr = &amp;out.expr[0];
+<span class="boring">}
+</span></code></pre></pre>
+<p>The error types are distinct (<code>HirpdagSerializeError</code> /
+<code>HirpdagDeserializeError</code>), mirroring serde's separation of <code>ser::Error</code> and
+<code>de::Error</code>.</p>
+<h2 id="format"><a class="header" href="#format">Format</a></h2>
+<p>The archive is a version, then a node table, then the typed roots
+(<code>HirpdagArchiveRoots</code>, serialized as one index vector per root type). Nodes
+are written in post-order DFS order (children before parents), and
+<code>#[hirpdag]</code> struct fields that reference other nodes are encoded as <code>u64</code>
+indices into the node table. <code>#[hirpdag]</code> enum values are not hashconsed and
+are stored inline inside their parent node.</p>
+<p>The binary header additionally carries a <strong>schema fingerprint</strong>: a stable
+hash of the module's hirpdag type definitions (computed at macro expansion
+time) plus a human-readable name (the defining package and its type list).
+Deserializing a binary archive written by different type definitions fails up
+front with a <code>SchemaMismatch</code> error naming both schemas, instead of
+misparsing:</p>
+<pre><code class="language-text">hirpdag: schema mismatch: archive was written by
+&quot;my_app:Item,Kind,Node&quot; (hash 0x…) but is being read by
+&quot;my_app:Widget&quot; (hash 0x…)
+</code></pre>
+<p>The JSON format deliberately omits the fingerprint so it stays hand-editable.</p>
+<p>Because children always precede parents, deserialization is a single forward
+pass: forward references are rejected, which also makes cycles
+unrepresentable. Each node is re-interned through the hashcons table as it is
+decoded, so:</p>
+<ul>
+<li>sharing is restored exactly;</li>
+<li>loading merges with nodes already live in the process (an in-process round
+trip yields pointer-equal nodes);</li>
+<li>metadata and creation IDs are recomputed rather than trusted from the file;</li>
+<li>normalizers do <strong>not</strong> re-run (the archived data was produced from
+already-normalized nodes).</li>
+</ul>
+<h2 id="caveats"><a class="header" href="#caveats">Caveats</a></h2>
+<ul>
+<li>(De)serialization uses a per-thread session; entry points are not re-entrant
+within a thread (concurrent use on different threads is fine). Serializing a
+hirpdag reference outside a session (e.g. calling <code>serde_json::to_string</code> on
+a node directly) is an error — there is no accidental tree-expansion path.</li>
+<li>Binary enum tags are ordinal: reordering <code>#[hirpdag]</code> type declarations or
+enum variants changes the wire format. The schema fingerprint turns this
+into an early, clear error for binary archives; JSON is name-tagged, more
+tolerant, and unfingerprinted.</li>
+<li>The collect walk is recursive; extremely deep chains could overflow the
+stack.</li>
+</ul>
+<p>See <code>docs/design/serialization.md</code> and
+<code>docs/adr/0001-serde-dag-aware-serialization.md</code> in the repository for the
+full design rationale.</p>
 
                     </main>
 
