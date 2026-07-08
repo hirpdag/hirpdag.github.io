@@ -151,7 +151,7 @@ Fibonacci-shaped DAG with two-parent sharing serializes in linear space, where
 a naive tree walk would be exponential.</p>
 <h2 id="api"><a class="header" href="#api">API</a></h2>
 <p>Struct types that may be serialization roots are marked with
-<code>#[hirpdag(root)]</code>. <code>#[hirpdag_end]</code> then generates a <code>HirpdagArchiveRoots</code>
+<code>#[hirpdag(root)]</code>. <code>#[hirpdag_module]</code> then generates a <code>HirpdagArchiveRoots</code>
 struct with one vector per root type (field names are the snake_case type
 names), plus entry points:</p>
 <ul>
