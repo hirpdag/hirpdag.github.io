@@ -209,7 +209,10 @@ Consider which fields will need to mutate together.</p>
 <p>If the nodes or edges carry some information, they should likely be separate nodes.
 This makes the graph better for persistence.</p>
 <p>An <a href="https://en.m.wikipedia.org/wiki/Adjacency_list">adjacency list</a> or <a href="https://en.m.wikipedia.org/wiki/Edge_list">edge list</a> can encode the graph structure itself.</p>
-<pre><code>type NodeIndex = u32;
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>type NodeIndex = u32;
 
 struct Node {
   name: String,
@@ -219,7 +222,21 @@ struct Graph {
   nodes: Vec&lt;Node&gt;,
   edges: Vec&lt;(NodeIndex, NodeIndex)&gt;, // Sorted
 }
-</code></pre>
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="no-interior-mutability"><a class="header" href="#no-interior-mutability">No Interior Mutability</a></h2>
+<p>Identity-defining data is fundamentally incompatible with interior mutability.</p>
+<p>Everything a Hirpdag node does (hash consing, equality, metadata, memoization, ...) assumes its contents are permanently immutable.</p>
+<h3 id="alternative-a-side-table-keyed-by-node-reference"><a class="header" href="#alternative-a-side-table-keyed-by-node-reference">Alternative: a side-table keyed by node reference</a></h3>
+<p>Mutable state associated with a node can be kept <em>outside</em> the node in a side-table keyed by the node's reference.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// The node stays immutable; mutable data lives beside it.
+let mut annotations: HashMap&lt;MyNode, Annotation&gt; = HashMap::new();
+annotations.insert(node.clone(), Annotation::new());
+<span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
