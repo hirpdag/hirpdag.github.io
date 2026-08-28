@@ -237,6 +237,14 @@ let mut annotations: HashMap&lt;MyNode, Annotation&gt; = HashMap::new();
 annotations.insert(node.clone(), Annotation::new());
 <span class="boring">}
 </span></code></pre></pre>
+<p>Hash consing is what makes this cheap: the node hashes and compares by its
+interned identity, so the side-table costs <code>O(1)</code> per lookup no matter how
+large the graph under the node is.</p>
+<p><code>hirpdag::base::HirpdagMemoizeMap&lt;Node, T&gt;</code> is a ready-made side-table for the
+common case of <em>deriving</em> something from a node: it fills through a shared
+reference (<code>&amp;table</code>), so several threads can build it together, and
+<code>get_or_else</code> computes an entry only if it is missing. Rewriting uses one of
+these per data type, gathered into the generated <code>HirpdagMemoizeCache</code>.</p>
 
                     </main>
 

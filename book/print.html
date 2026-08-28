@@ -302,9 +302,20 @@ This kind of statement reodering and combining would need compiler support to be
 <p>Apply rewrite rule to self.
 Rewrite all children.
 Construct a replacement for self, if anything changed.</p>
+<p>The rules and the traversal are separate: a rewriter supplies the per-type
+rules, a <em>driver</em> supplies the recursion. Rules are handed the driver and
+recurse through it, so swapping the driver changes how the graph is walked
+without touching a rule.</p>
 <h2 id="memoization-1"><a class="header" href="#memoization-1">Memoization</a></h2>
 <p>Enabled by immutability and reference counting.</p>
 <p>Hash map of reference to reference. Key is input, value is output.</p>
+<p>The memoizing driver consults that map before running a rule, and fills it
+afterwards. A node reached along many paths is a single interned node, so the
+second path is a hash lookup rather than a repeat of the subtree below it.</p>
+<p>The map is sharded and locked, not owned by one thread, so the same rewriter
+can be driven from several threads and each sees what the others have already
+computed. Nothing about the map is rewrite-specific: any computation keyed by a
+node can use it.</p>
 <h2 id="serialization"><a class="header" href="#serialization">Serialization</a></h2>
 <p>Leaf objects should appear before other objects which use them.
 The serialization ordering should be a valid bottom up partial order.
@@ -420,6 +431,14 @@ let mut annotations: HashMap&lt;MyNode, Annotation&gt; = HashMap::new();
 annotations.insert(node.clone(), Annotation::new());
 <span class="boring">}
 </span></code></pre></pre>
+<p>Hash consing is what makes this cheap: the node hashes and compares by its
+interned identity, so the side-table costs <code>O(1)</code> per lookup no matter how
+large the graph under the node is.</p>
+<p><code>hirpdag::base::HirpdagMemoizeMap&lt;Node, T&gt;</code> is a ready-made side-table for the
+common case of <em>deriving</em> something from a node: it fills through a shared
+reference (<code>&amp;table</code>), so several threads can build it together, and
+<code>get_or_else</code> computes an entry only if it is missing. Rewriting uses one of
+these per data type, gathered into the generated <code>HirpdagMemoizeCache</code>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="serialization-1"><a class="header" href="#serialization-1">Serialization</a></h1>
 <p>Hirpdag serialization is always DAG-aware: each unique node is written exactly
 once, so structural sharing survives a round trip and output size is
