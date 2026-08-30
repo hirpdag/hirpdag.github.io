@@ -155,10 +155,10 @@ a naive tree walk would be exponential.</p>
 struct with one vector per root type (field names are the snake_case type
 names), plus entry points:</p>
 <ul>
-<li><code>hirpdag_serialize(&amp;HirpdagArchiveRoots) -&gt; Result&lt;Vec&lt;u8&gt;, HirpdagSerializeError&gt;</code>
-— compact binary (via <a href="https://crates.io/crates/postcard">postcard</a>).</li>
+<li><code>hirpdag_serialize(&amp;HirpdagArchiveRoots) -&gt; Result&lt;Vec&lt;u8&gt;, HirpdagSerializeError&gt;</code>,
+compact binary (via <a href="https://crates.io/crates/postcard">postcard</a>).</li>
 <li><code>hirpdag_deserialize(&amp;[u8]) -&gt; Result&lt;HirpdagArchiveRoots, HirpdagDeserializeError&gt;</code></li>
-<li><code>hirpdag_serialize_json</code> / <code>hirpdag_deserialize_json</code> — the same archive as
+<li><code>hirpdag_serialize_json</code> / <code>hirpdag_deserialize_json</code>, the same archive as
 human-readable JSON.</li>
 </ul>
 <p>Types without <code>#[hirpdag(root)]</code> can still appear anywhere <em>inside</em> the DAG;
@@ -192,7 +192,7 @@ are written in post-order DFS order (children before parents), and
 <code>#[hirpdag]</code> struct fields that reference other nodes are encoded as <code>u64</code>
 indices into the node table. <code>#[hirpdag]</code> enum values are not hashconsed and
 are stored inline inside their parent node.</p>
-<p>The binary header additionally carries a <strong>schema fingerprint</strong>: a stable
+<p>The binary header also carries a schema fingerprint: a stable
 hash of the module's hirpdag type definitions (computed at macro expansion
 time) plus a human-readable name (the defining package and its type list).
 Deserializing a binary archive written by different type definitions fails up
@@ -212,7 +212,7 @@ decoded, so:</p>
 <li>loading merges with nodes already live in the process (an in-process round
 trip yields pointer-equal nodes);</li>
 <li>metadata and creation IDs are recomputed rather than trusted from the file;</li>
-<li>normalizers do <strong>not</strong> re-run (the archived data was produced from
+<li>normalizers do not re-run (the archived data was produced from
 already-normalized nodes).</li>
 </ul>
 <h2 id="caveats"><a class="header" href="#caveats">Caveats</a></h2>
@@ -220,7 +220,7 @@ already-normalized nodes).</li>
 <li>(De)serialization uses a per-thread session; entry points are not re-entrant
 within a thread (concurrent use on different threads is fine). Serializing a
 hirpdag reference outside a session (e.g. calling <code>serde_json::to_string</code> on
-a node directly) is an error — there is no accidental tree-expansion path.</li>
+a node directly) is an error. There is no accidental tree-expansion path.</li>
 <li>Binary enum tags are ordinal: reordering <code>#[hirpdag]</code> type declarations or
 enum variants changes the wire format. The schema fingerprint turns this
 into an early, clear error for binary archives; JSON is name-tagged, more
