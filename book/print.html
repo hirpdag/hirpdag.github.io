@@ -513,10 +513,11 @@ already-normalized nodes).</li>
 </ul>
 <h2 id="caveats"><a class="header" href="#caveats">Caveats</a></h2>
 <ul>
-<li>(De)serialization uses a per-thread session; entry points are not re-entrant
-within a thread (concurrent use on different threads is fine). Serializing a
-hirpdag reference outside a session (e.g. calling <code>serde_json::to_string</code> on
-a node directly) is an error. There is no accidental tree-expansion path.</li>
+<li>A hirpdag reference has no <code>Serialize</code> or <code>Deserialize</code> implementation of
+its own: what serde sees is an archive, in which every reference has already
+become a node table index. So there is no accidental tree-expansion path —
+<code>serde_json::to_string</code> on a node directly does not compile — and no ambient
+state either: archives nest and run concurrently without arrangement.</li>
 <li>Binary enum tags are ordinal: reordering <code>#[hirpdag]</code> type declarations or
 enum variants changes the wire format. The schema fingerprint turns this
 into an early, clear error for binary archives; JSON is name-tagged, more
