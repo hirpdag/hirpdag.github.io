@@ -162,8 +162,12 @@ compact binary (via <a href="https://crates.io/crates/postcard">postcard</a>).</
 human-readable JSON.</li>
 </ul>
 <p>Types without <code>#[hirpdag(root)]</code> can still appear anywhere <em>inside</em> the DAG;
-they just cannot be roots. <code>HirpdagArchiveRoots</code> implements <code>Default</code>, so a
-subset of the root types can be set with struct update syntax:</p>
+they just cannot be roots. Each root type gets a field named <code>roots_</code> plus the
+type's name, carried through verbatim so that two types differing only in case
+cannot name the same field (see
+<a href="https://github.com/hirpdag/hirpdag/blob/main/docs/adr/0006-generated-names-from-the-declared-name.md">ADR-0006</a>).
+<code>HirpdagArchiveRoots</code> implements <code>Default</code>, so a subset of the root types can be
+set with struct update syntax:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -174,12 +178,12 @@ struct Expr { ... }
 struct Variables { ... }
 
 let bytes = hirpdag_serialize(&amp;HirpdagArchiveRoots {
-    expr: vec![e1, e2],
-    variables: vec![vars],
+    roots_Expr: vec![e1, e2],
+    roots_Variables: vec![vars],
 })?;
 
 let out = hirpdag_deserialize(&amp;bytes)?;
-let e1_again: &amp;Expr = &amp;out.expr[0];
+let e1_again: &amp;Expr = &amp;out.roots_Expr[0];
 <span class="boring">}
 </span></code></pre></pre>
 <p>The error types are distinct (<code>HirpdagSerializeError</code> /
@@ -187,7 +191,8 @@ let e1_again: &amp;Expr = &amp;out.expr[0];
 <code>de::Error</code>.</p>
 <h2 id="format"><a class="header" href="#format">Format</a></h2>
 <p>The archive is a version, then a node table, then the typed roots
-(<code>HirpdagArchiveRoots</code>, serialized as one index vector per root type). Nodes
+(<code>HirpdagArchiveRoots</code>, serialized as one index vector per root type, keyed by
+the <code>roots_&lt;Type&gt;</code> field name in JSON). Nodes
 are written in post-order DFS order (children before parents), and
 <code>#[hirpdag]</code> struct fields that reference other nodes are encoded as <code>u64</code>
 indices into the node table. <code>#[hirpdag]</code> enum values are not hashconsed and
