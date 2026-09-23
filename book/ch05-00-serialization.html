@@ -231,8 +231,9 @@ state either: archives nest and run concurrently without arrangement.</li>
 enum variants changes the wire format. The schema fingerprint turns this
 into an early, clear error for binary archives; JSON is name-tagged, more
 tolerant, and unfingerprinted.</li>
-<li>The collect walk is recursive; extremely deep chains could overflow the
-stack.</li>
+<li>Serializing and deserializing are iterative, so graph depth is limited by
+memory rather than by the thread's stack. Dropping, rewriting and
+<code>Debug</code>-formatting a graph still recurse once per level of depth.</li>
 </ul>
 <p>See <code>docs/design/serialization.md</code> in the repository for the full design, and
 <code>docs/adr/</code> for the decisions behind it.</p>
