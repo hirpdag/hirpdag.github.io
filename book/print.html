@@ -334,7 +334,10 @@ A post-order traversal will produce one possible linear ordering.</p>
 <li>DAG Count</li>
 <li>Content flags</li>
 </ul>
-<p>The content flags are intended to provide a hint to avoid unnecessary traversals.</p>
+<p>The content flags are intended to provide a hint to avoid unnecessary traversals.
+A type sets its own bits with <code>#[hirpdag(flags = path::to_fn)]</code>, and a node's
+flags are its own bits ORed with those of everything below it. All three are
+computed once when the object is interned and read with <code>hirpdag_get_meta()</code>.</p>
 <h2 id="reference-count-update-elision"><a class="header" href="#reference-count-update-elision">Reference Count Update Elision</a></h2>
 <p>Incrementing and decrementing can be expensive and they may occur frequently. Because the count is shared so these updates must be atomic.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="techniques"><a class="header" href="#techniques">Techniques</a></h1>
